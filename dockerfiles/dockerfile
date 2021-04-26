@@ -1,0 +1,108 @@
+FROM alpine:latest
+
+LABEL MAINTAINER="[Barre Kevin]"
+LABEL DESCRIPTION="Pysmina example in container"
+LABEL VERSION="0.1.0"
+
+ARG USERNAME=node
+ARG USER_UID=1000
+
+ENV LOGGING_LEVEL=INFO
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 HOME=/home/${USERNAME}
+ENV PATH=/usr/sbin:/bin:/sbin:/usr/bin:${HOME}/.local/bin:/usr/local/bin
+ENV USER_NAME=$USERNAME
+
+SHELL ["/bin/sh", "-c"]
+
+RUN set -eux; \
+    echo "@testing http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories \
+    && apk add --update --no-cache \
+    bash \
+    alpine-sdk \
+    build-base \
+    python3-dev \
+    boost-dev \
+    py-pip \
+    zlib-dev
+
+RUN set -eux; \
+    curl "https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub" -o /etc/apk/keys/sgerrand.rsa.pub && \
+    curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.32-r0/glibc-2.32-r0.apk" -o glibc.apk && \
+    apk add glibc.apk && \
+    curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.32-r0/glibc-bin-2.32-r0.apk" -o glibc-bin.apk && \
+    apk add glibc-bin.apk && \ 
+    curl -L "https://github.com/andyshinn/alpine-pkg-glibc/releases/download/2.32-r0/glibc-i18n-2.32-r0.apk" -o glibc-i18n.apk && \
+    apk add --allow-untrusted glibc-i18n.apk && \
+    /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8 && \
+    /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc/usr/lib && \
+    rm -rf glibc*apk /var/cache/apk/* 
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR ${HOME}
+
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    --uid ${USER_UID} \
+    ${USERNAME}
+
+ENV APP_HOME ${HOME}/app/
+RUN set -eux;\
+    mkdir -p ${APP_HOME} && \
+    chown -R ${USERNAME}:${USERNAME} ${HOME}
+
+# BUILD CMake #
+RUN set -eux; \
+    curl --progress-bar -LO \
+    https://github.com/Kitware/CMake/releases/download/v3.20.1/cmake-3.20.1-linux-x86_64.sh && \
+    yes | sh cmake-3.20.1-linux-x86_64.sh && \
+    cp -R cmake-3.20.1-linux-x86_64/* / && \
+    rm -rf cmake-3.20.1-linux-x86_64.sh cmake-3.20.1-linux-x86_64
+
+# BUILD openbabel #
+RUN set -eux; \
+    curl --progress-bar -LO \
+    https://github.com/openbabel/openbabel/releases/download/openbabel-3-1-1/openbabel-3.1.1-source.tar.bz2 && \
+    tar xvf openbabel-3.1.1-source.tar.bz2 && \
+    mkdir openbabel-3.1.1/build && \
+    cd openbabel-3.1.1/build && \
+    cmake .. && make -j`nproc` && \
+    make install && cd ../../ && \
+    rm -r openbabel-3.1.1 openbabel-3.1.1-source.tar.bz2
+
+# BUILD libeigen #
+RUN set -eux; \
+    curl --progress-bar -LO \
+    https://gitlab.com/libeigen/eigen/-/archive/3.4-rc1/eigen-3.4-rc1.tar.bz2 &&\
+    tar xvf eigen-3.4-rc1.tar.bz2 && \
+    cd eigen-3.4-rc1 && \
+    mkdir build_dir && \
+    cd build_dir && \
+    cmake .. && \
+    make install && cd ../../ && \
+    rm -rf eigen-3.4-rc1 eigen-3.4-rc1.tar.bz2
+
+
+WORKDIR $HOME
+
+# Lower Privileges
+USER $USER_NAME
+
+RUN echo "PATH=${PATH}" >> ~/.bashrc
+COPY --chown=${USER_NAME}:${USER_NAME} dockerfiles/entrypoint.sh ${HOME}
+
+USER $USER_NAME
+WORKDIR ${APP_HOME}
+COPY --chown=${USER_NAME}:${USER_NAME} . ./pysmina/
+RUN set -eux && \
+    cd pysmina && \
+    pip install .
+
+ENTRYPOINT ["/bin/bash", "/home/node/entrypoint.sh"]
+# CMD ["bash"]
+# Chmod -R a+w your curent dir if you remove root user
+# Otherwise curent user cannot write
+# USER root
+CMD ["python3", "pysmina/example/example.py"]
