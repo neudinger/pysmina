@@ -13,15 +13,6 @@ Pysmina is maintained by Barre Kevin.
 
 ## Local
 
-### Install
-
-Linux only:
-
-```bash
-conda env create --name pysminaenv --file requirement.yml
-conda activate pysminaenv
-```
-
 ### Requirement
 
 - cmake
@@ -117,12 +108,23 @@ TORSDOF 2
 $$$$
 ```
 
+## Documentation
+
+[pdoc3](https://pdoc3.github.io/pdoc/)
+
+<img src="https://pdoc3.github.io/pdoc/logo.png" width="100" height="100">
+
+```bash
+pdoc3 pysmina --http localhost:8080
+```
+
 ## Dev
 
 Files changed :
 
-- lib/main.cpp
-- lib/pycompute.cpp
+- [main.cpp](https://github.com/neudinger/pysmina/blob/main/pysmina/lib/main.cpp)
+- [pycompute.cpp](https://github.com/neudinger/pysmina/blob/main/pysmina/lib/pycompute.cpp)
+- [result_info](https://github.com/neudinger/pysmina/blob/main/pysmina/lib/result_info.cpp)
 
 ## Library used
 
